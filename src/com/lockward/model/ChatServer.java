@@ -40,17 +40,21 @@ public class ChatServer extends Thread {
 				client = serverSocket.accept();
 
 				System.out.println("Client connected");
+				System.out.println("Client IP: " + client.getInetAddress());
+				System.out.println("Client port: " + client.getPort());
 				ObjectOutputStream output = new ObjectOutputStream(client.getOutputStream());
 				output.flush();
 				ObjectInputStream input = new ObjectInputStream(new BufferedInputStream(client.getInputStream()));
-//				PrintWriter output = new PrintWriter(client.getOutputStream());
+				// PrintWriter output = new
+				// PrintWriter(client.getOutputStream());
 				// ChatClient chatClient = new ChatClient(client);
 				// clientList.add(chatClient);
 
 				Message message = (Message) input.readObject();
-				parseInput(message);
-//				echoer = new Echoer(client);
-//				echoer.start();
+				parseInput(client, message);
+
+				// echoer = new Echoer(client);
+				// echoer.start();
 			}
 		} catch (IOException e) {
 			System.out.println("Server Error: " + e.getMessage());
@@ -68,19 +72,20 @@ public class ChatServer extends Thread {
 
 	}
 
-	private void parseInput(Message message) {
+	private void parseInput(Socket client, Message message) throws IOException {
 		System.out.println("Parsing input: " + message.getMessage());
 		switch (message.getMessageType()) {
 		case REGISTER:
-			registerNewUser(message.getUsername());
+			registerNewUser(client, message.getUsername());
 			break;
 		default:
 			break;
 		}
 	}
 
-	private void registerNewUser(String username) {
+	private void registerNewUser(Socket client, String username) throws IOException {
 		System.out.println("Registrando usuario: " + username);
+		clientList.add(new ChatClient(username, client));
 	}
 
 	public void process() {
