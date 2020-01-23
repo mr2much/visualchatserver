@@ -60,6 +60,9 @@ public class ServerThread extends Thread {
 		case REGISTER:
 			chatServer.registerNewUser(client, message.getUsername());
 			break;
+		case LOGOFF:
+			System.out.println(message.getMessage());
+			break;
 		case TEXT:
 			chatServer.broadcast(message);
 		default:

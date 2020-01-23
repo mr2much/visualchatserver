@@ -5,11 +5,17 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class ChatServer extends Thread {
+	List<Socket> clients = new ArrayList<>();
 	List<ChatClient> clientList = new ArrayList<>();
 
 	private ServerSocket serverSocket;
+	private final ExecutorService connectionPool = Executors.newCachedThreadPool();
+	private Socket client = null;
 
 	public void connect() throws IOException {
 		if (serverSocket == null || isClosed()) {
@@ -18,6 +24,21 @@ public class ChatServer extends Thread {
 	}
 
 	public void close() throws IOException {
+		connectionPool.shutdown();
+
+		try {
+			if (!connectionPool.awaitTermination(5, TimeUnit.SECONDS)) {
+				connectionPool.shutdownNow();
+
+				if (!connectionPool.awaitTermination(5, TimeUnit.SECONDS)) {
+					System.err.println("Pool did not terminate");
+				}
+			}
+		} catch (InterruptedException e) {
+			connectionPool.shutdown();
+			Thread.currentThread().interrupt();
+		}
+
 		serverSocket.close();
 		this.interrupt();
 	}
@@ -31,19 +52,17 @@ public class ChatServer extends Thread {
 		System.out.println("Server up and running...");
 		try {
 			while (!serverSocket.isClosed()) {
-				Socket client;
-
 				client = serverSocket.accept();
 
 				System.out.println("Client connected");
 				System.out.println("Client IP: " + client.getInetAddress());
 				System.out.println("Client port: " + client.getPort());
 
-				new ServerThread(client, this).start();
+				connectionPool.execute(new ServerThread(client, this));
 			}
 		} catch (IOException e) {
 			System.out.println("Server Error: " + e.getMessage());
-			Thread.currentThread().interrupt();
+			connectionPool.shutdown();
 		} finally {
 			try {
 				serverSocket.close();
@@ -56,7 +75,9 @@ public class ChatServer extends Thread {
 
 	void registerNewUser(Socket client, String username) throws IOException {
 		System.out.println("Registrando usuario: " + username);
-//		clientList.add(new ChatClient(username, client));
+		clients.add(client);
+		System.out.println("Clients: " + clients.size());
+		// clientList.add(new ChatClient(username, client));
 	}
 
 	void broadcast(Message message) {
