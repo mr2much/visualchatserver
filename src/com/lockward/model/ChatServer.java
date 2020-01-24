@@ -12,9 +12,10 @@ import java.util.concurrent.TimeUnit;
 public class ChatServer extends Thread {
 	List<Socket> clients = new ArrayList<>();
 	List<ChatClient> clientList = new ArrayList<>();
+	List<ServerThread> activeConnections = new ArrayList<>();
 
 	private ServerSocket serverSocket;
-	private final ExecutorService connectionPool = Executors.newCachedThreadPool();
+	private final ExecutorService connectionPool = Executors.newFixedThreadPool(20);
 	private Socket client = null;
 
 	public void connect() throws IOException {
@@ -58,8 +59,13 @@ public class ChatServer extends Thread {
 				System.out.println("Client IP: " + client.getInetAddress());
 				System.out.println("Client port: " + client.getPort());
 
-				connectionPool.execute(new ServerThread(client, this));
+				ServerThread newConnection = new ServerThread(client, this);
+				activeConnections.add(newConnection);
+
+				connectionPool.execute(newConnection);
 			}
+
+			connectionPool.shutdown();
 		} catch (IOException e) {
 			System.out.println("Server Error: " + e.getMessage());
 			connectionPool.shutdown();
@@ -73,7 +79,7 @@ public class ChatServer extends Thread {
 
 	}
 
-	void registerNewUser(Socket client, String username) throws IOException {
+	void registerNewUser(Socket client, String username) {
 		System.out.println("Registrando usuario: " + username);
 		clients.add(client);
 		System.out.println("Clients: " + clients.size());
@@ -81,12 +87,36 @@ public class ChatServer extends Thread {
 	}
 
 	void broadcast(Message message) {
-		System.out.println("Message received: " + message.getMessage());
+		for(ServerThread activeConnection : activeConnections) {
+			try {
+				activeConnection.forwardMessage(message);
+			} catch (IOException e) {
+				System.err.println("Error forwarding message: " + e.getMessage());
+			}
+		}
 	}
 
 	public void process() {
 		// for(ChatClient c : clientList) {
 		//
 		// }
+	}
+
+	public boolean removeClient(Socket client) {
+		ServerThread clientConnection = null;
+
+		for(ServerThread conn : activeConnections) {
+			if(conn.getClient() == client) {
+				clientConnection = conn;
+				break;
+			}
+		}
+
+		if(clientConnection != null) {
+			activeConnections.remove(clientConnection);
+			System.out.println("Connection removed successfully");
+		}
+
+		return clients.remove(client);
 	}
 }
