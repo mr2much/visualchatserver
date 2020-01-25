@@ -82,6 +82,8 @@ public class ChatServer extends Thread {
 	void registerNewUser(Socket client, String username) {
 		System.out.println("Registrando usuario: " + username);
 		clients.add(client);
+
+		// create a direct output stream to the client, and add it to a list for broadcast
 		System.out.println("Clients: " + clients.size());
 		// clientList.add(new ChatClient(username, client));
 	}
