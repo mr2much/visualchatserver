@@ -36,9 +36,9 @@ public class ServerThread extends Thread {
 					parseInput(client, message);
 				}
 
-				// output.writeObject(new Message(MessageType.OKAY, "Received",
-				// "Server"));
-				// output.flush();
+//				 output.writeObject(new Message(MessageType.OKAY, "Received",
+//				 "Server"));
+//				 output.flush();
 			}
 
 		} catch (IOException e) {
@@ -59,21 +59,30 @@ public class ServerThread extends Thread {
 		return client;
 	}
 
+	public ObjectOutputStream getObjectOutputStream() {
+		return output;
+	}
+
 	private void parseInput(Socket client, Message message) {
 		System.out.println("Parsing input: " + message.getMessage());
 
 		switch (message.getMessageType()) {
 		case REGISTER:
-			chatServer.registerNewUser(client, message.getUsername());
+			chatServer.registerNewUser(client, output, message.getUsername());
 			break;
 		case LOGOFF:
 			System.out.println(message.getMessage());
 			try {
-				client.close();
-
 				if (chatServer.removeClient(client)) {
+					chatServer.broadcast(new Message(MessageType.STATUS,
+							message.getUsername() + " disconnected",
+							"Server"));
 					System.out.println(message.getUsername() + " disconnected");
+				} else {
+					System.out.println("Client not removed: " + client.getInetAddress());
 				}
+
+				client.close();
 			} catch (IOException e) {
 				System.err.println("Error cerrando conexión para usuario: " + message.getUsername());
 				System.err.println("Error: " + e.getMessage());
@@ -88,14 +97,9 @@ public class ServerThread extends Thread {
 //				System.out.println("Error forwarding message: " + e.getMessage());
 //			}
 			chatServer.broadcast(message);
+			break;
 		default:
 			break;
 		}
 	}
-
-	public void forwardMessage(Message message) throws IOException {
-		output.writeObject(message);
-		output.flush();
-	}
-
 }

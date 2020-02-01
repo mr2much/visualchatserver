@@ -1,6 +1,7 @@
 package com.lockward.model;
 
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ public class ChatServer extends Thread {
 	List<Socket> clients = new ArrayList<>();
 	List<ChatClient> clientList = new ArrayList<>();
 	List<ServerThread> activeConnections = new ArrayList<>();
+	List<ObjectOutputStream> broadcastList = new ArrayList<>();
 
 	private ServerSocket serverSocket;
 	private final ExecutorService connectionPool = Executors.newFixedThreadPool(20);
@@ -60,8 +62,9 @@ public class ChatServer extends Thread {
 				System.out.println("Client port: " + client.getPort());
 
 				ServerThread newConnection = new ServerThread(client, this);
+				System.out.println("adding new connection");
 				activeConnections.add(newConnection);
-
+				System.out.println("running new thread");
 				connectionPool.execute(newConnection);
 			}
 
@@ -79,21 +82,27 @@ public class ChatServer extends Thread {
 
 	}
 
-	void registerNewUser(Socket client, String username) {
+	void registerNewUser(Socket client, ObjectOutputStream oos, String username) {
 		System.out.println("Registrando usuario: " + username);
 		clients.add(client);
 
-		// create a direct output stream to the client, and add it to a list for broadcast
-		System.out.println("Clients: " + clients.size());
-		// clientList.add(new ChatClient(username, client));
+		// announce new client to other users
+		broadcast(new Message(MessageType.STATUS, username + " has logged in", "Server"));
+		// create a direct output stream to the client, and add it to a list for
+		// broadcast
+		broadcastList.add(oos);
+
 	}
 
 	void broadcast(Message message) {
-		for(ServerThread activeConnection : activeConnections) {
+		System.out.println("Broadcasting message..." + message.getMessage() + " from: " + message.getUsername());
+		System.out.println("To: " + broadcastList.size() + " clients");
+		for (ObjectOutputStream out : broadcastList) {
 			try {
-				activeConnection.forwardMessage(message);
+				out.writeObject(message);
+				out.flush();
 			} catch (IOException e) {
-				System.err.println("Error forwarding message: " + e.getMessage());
+				System.out.println("Error sending message: " + e.getMessage());
 			}
 		}
 	}
@@ -105,19 +114,19 @@ public class ChatServer extends Thread {
 	}
 
 	public boolean removeClient(Socket client) {
-		ServerThread clientConnection = null;
-
-		for(ServerThread conn : activeConnections) {
-			if(conn.getClient() == client) {
-				clientConnection = conn;
-				break;
-			}
-		}
-
-		if(clientConnection != null) {
-			activeConnections.remove(clientConnection);
-			System.out.println("Connection removed successfully");
-		}
+		// ServerThread clientConnection = null;
+		//
+		// for(ServerThread conn : activeConnections) {
+		// if(conn.getClient() == client) {
+		// clientConnection = conn;
+		// break;
+		// }
+		// }
+		//
+		// if(clientConnection != null) {
+		// activeConnections.remove(clientConnection);
+		// System.out.println("Connection removed successfully");
+		// }
 
 		return clients.remove(client);
 	}
