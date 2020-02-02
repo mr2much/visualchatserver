@@ -35,20 +35,22 @@ public class ServerThread extends Thread {
 					System.out.println("Message: " + message.getMessage());
 					parseInput(client, message);
 				}
-
-//				 output.writeObject(new Message(MessageType.OKAY, "Received",
-//				 "Server"));
-//				 output.flush();
 			}
 
 		} catch (IOException e) {
-			System.out.println("Server Error: " + e.getMessage());
+			if (e.getMessage().equalsIgnoreCase("socket closed")) {
+			} else {
+				System.out.println("Server Error: " + e.getMessage());
+			}
+
 		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			System.out.println("Server error processing the message: " + e.getMessage());
 		} finally {
 			try {
+				output.close();
+				input.close();
 				client.close();
+				this.interrupt();
 			} catch (IOException e) {
 				System.out.println("Error trying to close client connection: " + e.getMessage());
 			}
@@ -66,36 +68,32 @@ public class ServerThread extends Thread {
 	private void parseInput(Socket client, Message message) {
 		System.out.println("Parsing input: " + message.getMessage());
 
+		String username = message.getUsername();
+
 		switch (message.getMessageType()) {
 		case REGISTER:
-			chatServer.registerNewUser(client, output, message.getUsername());
+			chatServer.registerNewUser(client, output, username);
 			break;
 		case LOGOFF:
 			System.out.println(message.getMessage());
 			try {
-				if (chatServer.removeClient(client)) {
-					chatServer.broadcast(new Message(MessageType.STATUS,
-							message.getUsername() + " disconnected",
-							"Server"));
-					System.out.println(message.getUsername() + " disconnected");
+				if (chatServer.removeClient(username, output)) {
+					chatServer.broadcast(new Message(MessageType.STATUS, message.getMessage(), "Server"));
+					System.out.println(username + " disconnected");
 				} else {
 					System.out.println("Client not removed: " + client.getInetAddress());
 				}
-
+				this.interrupt();
+				output.close();
+				input.close();
 				client.close();
 			} catch (IOException e) {
-				System.err.println("Error cerrando conexión para usuario: " + message.getUsername());
+				System.err.println("Error cerrando conexión para usuario: " + username);
 				System.err.println("Error: " + e.getMessage());
 			}
 
 			break;
 		case TEXT:
-//			try {
-//				output.writeObject(message);
-//				output.flush();
-//			} catch (IOException e) {
-//				System.out.println("Error forwarding message: " + e.getMessage());
-//			}
 			chatServer.broadcast(message);
 			break;
 		default:

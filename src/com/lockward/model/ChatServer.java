@@ -5,16 +5,18 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class ChatServer extends Thread {
-	List<Socket> clients = new ArrayList<>();
-	List<ChatClient> clientList = new ArrayList<>();
-	List<ServerThread> activeConnections = new ArrayList<>();
 	List<ObjectOutputStream> broadcastList = new ArrayList<>();
+	Map<String, ObjectOutputStream> listeners = new HashMap<>();
 
 	private ServerSocket serverSocket;
 	private final ExecutorService connectionPool = Executors.newFixedThreadPool(20);
@@ -27,6 +29,7 @@ public class ChatServer extends Thread {
 	}
 
 	public void close() throws IOException {
+		closeClientConnections();
 		connectionPool.shutdown();
 
 		try {
@@ -46,6 +49,14 @@ public class ChatServer extends Thread {
 		this.interrupt();
 	}
 
+	private void closeClientConnections() throws IOException {
+		// iterate through all client connections and close them
+		for(String username : listeners.keySet()) {
+			ObjectOutputStream oos = listeners.get(username);
+			oos.close();
+		}
+	}
+
 	public boolean isClosed() {
 		return serverSocket.isClosed();
 	}
@@ -63,14 +74,18 @@ public class ChatServer extends Thread {
 
 				ServerThread newConnection = new ServerThread(client, this);
 				System.out.println("adding new connection");
-				activeConnections.add(newConnection);
 				System.out.println("running new thread");
 				connectionPool.execute(newConnection);
 			}
 
 			connectionPool.shutdown();
 		} catch (IOException e) {
-			System.out.println("Server Error: " + e.getMessage());
+			if (e.getMessage().equalsIgnoreCase("socket closed")) {
+				System.out.println("Fuck off");
+			} else {
+				System.out.println("Server Error: " + e.getMessage());
+			}
+
 			connectionPool.shutdown();
 		} finally {
 			try {
@@ -84,27 +99,31 @@ public class ChatServer extends Thread {
 
 	void registerNewUser(Socket client, ObjectOutputStream oos, String username) {
 		System.out.println("Registrando usuario: " + username);
-		clients.add(client);
 
 		// announce new client to other users
 		broadcast(new Message(MessageType.STATUS, username + " has logged in", "Server"));
 		// create a direct output stream to the client, and add it to a list for
 		// broadcast
+		listeners.put(username, oos);
 		broadcastList.add(oos);
 
 	}
 
 	void broadcast(Message message) {
 		System.out.println("Broadcasting message..." + message.getMessage() + " from: " + message.getUsername());
-		System.out.println("To: " + broadcastList.size() + " clients");
-		for (ObjectOutputStream out : broadcastList) {
+		System.out.println("To: " + listeners.size() + " clients");
+
+		for (String username : listeners.keySet()) {
 			try {
+				ObjectOutputStream out = listeners.get(username);
 				out.writeObject(message);
 				out.flush();
 			} catch (IOException e) {
 				System.out.println("Error sending message: " + e.getMessage());
 			}
+
 		}
+
 	}
 
 	public void process() {
@@ -113,21 +132,11 @@ public class ChatServer extends Thread {
 		// }
 	}
 
-	public boolean removeClient(Socket client) {
-		// ServerThread clientConnection = null;
-		//
-		// for(ServerThread conn : activeConnections) {
-		// if(conn.getClient() == client) {
-		// clientConnection = conn;
-		// break;
-		// }
-		// }
-		//
-		// if(clientConnection != null) {
-		// activeConnections.remove(clientConnection);
-		// System.out.println("Connection removed successfully");
-		// }
+	public boolean removeClient(String username, ObjectOutputStream oos) {
+		if (listeners.containsKey(username)) {
+			return listeners.remove(username, oos);
+		}
 
-		return clients.remove(client);
+		return false;
 	}
 }
