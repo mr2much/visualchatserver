@@ -50,8 +50,11 @@ public class ChatServer extends Thread {
 	}
 
 	private void closeClientConnections() throws IOException {
+		// notify all users that the server is being shutdown
+		broadcast(new Message(MessageType.SHUTDOWN, "Last words are for fools who haven't said enough!", "Server"));
+
 		// iterate through all client connections and close them
-		for(String username : listeners.keySet()) {
+		for (String username : listeners.keySet()) {
 			ObjectOutputStream oos = listeners.get(username);
 			oos.close();
 		}
