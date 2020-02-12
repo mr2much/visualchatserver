@@ -117,8 +117,12 @@ public class ChatServer extends Thread {
 		users.add(username);
 
 		broadcast(builder.messageType(MessageType.STATUS).subMessageType(MessageType.ADD)
-				.msg(username + " has logged in").attachment(users.toArray()).username("Server").build());
+				.msg(username + " has logged in").attachment(getOnlineUsersAsArray()).username("Server").build());
 
+	}
+
+	private String[] getOnlineUsersAsArray() {
+		return users.toArray(new String[users.size()]);
 	}
 
 	void broadcast(Message message) {
