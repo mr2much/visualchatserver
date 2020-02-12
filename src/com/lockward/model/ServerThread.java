@@ -11,6 +11,7 @@ public class ServerThread extends Thread {
 	private ObjectInputStream input;
 	private Socket client = null;
 	private ChatServer chatServer;
+	private MessageBuilder builder = new MessageBuilder();
 
 	public ServerThread(Socket client, ChatServer chatServer) {
 		this.client = client;
@@ -78,7 +79,8 @@ public class ServerThread extends Thread {
 			System.out.println(message.getMessage());
 			try {
 				if (chatServer.removeClient(username, output)) {
-					chatServer.broadcast(new Message(MessageType.STATUS, message.getMessage(), "Server"));
+					chatServer.broadcast(builder.messageType(MessageType.STATUS).subMessageType(MessageType.LOGOFF)
+							.msg(message.getMessage()).username("Server").build());
 					System.out.println(username + " disconnected");
 				} else {
 					System.out.println("Client not removed: " + client.getInetAddress());
@@ -94,6 +96,7 @@ public class ServerThread extends Thread {
 
 			break;
 		case TEXT:
+			message.setSubMessageType(MessageType.TEXT);
 			chatServer.broadcast(message);
 			break;
 		default:

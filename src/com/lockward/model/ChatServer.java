@@ -6,10 +6,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -17,10 +17,13 @@ import java.util.concurrent.TimeUnit;
 public class ChatServer extends Thread {
 	List<ObjectOutputStream> broadcastList = new ArrayList<>();
 	Map<String, ObjectOutputStream> listeners = new HashMap<>();
+	private ConcurrentSkipListSet<String> users = new ConcurrentSkipListSet<>();
 
 	private ServerSocket serverSocket;
 	private final ExecutorService connectionPool = Executors.newFixedThreadPool(20);
 	private Socket client = null;
+
+	private MessageBuilder builder = new MessageBuilder();
 
 	public void connect() throws IOException {
 		if (serverSocket == null || isClosed()) {
@@ -51,7 +54,8 @@ public class ChatServer extends Thread {
 
 	private void closeClientConnections() throws IOException {
 		// notify all users that the server is being shutdown
-		broadcast(new Message(MessageType.SHUTDOWN, "Last words are for fools who haven't said enough!", "Server"));
+		broadcast(builder.messageType(MessageType.STATUS).subMessageType(MessageType.SHUTDOWN)
+				.msg("Last words are for fools who haven't said enough!").username("Server").build());
 
 		// iterate through all client connections and close them
 		for (String username : listeners.keySet()) {
@@ -67,6 +71,7 @@ public class ChatServer extends Thread {
 	@Override
 	public void run() {
 		System.out.println("Server up and running...");
+
 		try {
 			while (!serverSocket.isClosed()) {
 				client = serverSocket.accept();
@@ -104,11 +109,15 @@ public class ChatServer extends Thread {
 		System.out.println("Registrando usuario: " + username);
 
 		// announce new client to other users
-		broadcast(new Message(MessageType.STATUS, username + " has logged in", "Server"));
+
 		// create a direct output stream to the client, and add it to a list for
 		// broadcast
 		listeners.put(username, oos);
 		broadcastList.add(oos);
+		users.add(username);
+
+		broadcast(builder.messageType(MessageType.STATUS).subMessageType(MessageType.ADD)
+				.msg(username + " has logged in").attachment(users.toArray()).username("Server").build());
 
 	}
 
@@ -137,6 +146,7 @@ public class ChatServer extends Thread {
 
 	public boolean removeClient(String username, ObjectOutputStream oos) {
 		if (listeners.containsKey(username)) {
+			users.remove(username);
 			return listeners.remove(username, oos);
 		}
 
