@@ -16,12 +16,17 @@ public class ServerThread extends Thread {
 	public ServerThread(Socket client, ChatServer chatServer) {
 		this.client = client;
 		this.chatServer = chatServer;
+		if (client == null) {
+			System.out.println("Nothing to see here");
+		}
+
 	}
 
 	@Override
 	public void run() {
-		Message message = null;
 		try {
+			Message message = null;
+
 			if (output == null) {
 				output = new ObjectOutputStream(client.getOutputStream());
 			}
@@ -40,6 +45,7 @@ public class ServerThread extends Thread {
 
 		} catch (IOException e) {
 			if (e.getMessage().equalsIgnoreCase("socket closed")) {
+
 			} else {
 				System.out.println("Server Error: " + e.getMessage());
 			}
